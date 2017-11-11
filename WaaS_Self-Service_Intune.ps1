@@ -3,10 +3,15 @@
 #Twitter: @Bindertech
 #Thanks to: @daltondhcp
 
-#Using Azure Automation
-#Replace the -Name parameter with your Automation Account
+<#Using Azure Automation
+#Replace both the -Name values to suit your environment.
 
-#$Credential = Get-AutomationPSCredential -Name 'Global Admin'
+$Credential = Get-AutomationPSCredential -Name 'Global Admin'
+$WindowsVersion = Get-AutomationVariable -Name 'WindowsVersion'
+Connect-AzureAD -Credential $Credential
+#>
+
+#Run manually
 
 Param(
   [Parameter(Mandatory=$True,HelpMessage='Enter Windows 10 release number, for example 1709',Position=1)]
@@ -14,7 +19,6 @@ Param(
 	
 )
 
-Connect-AzureAD
 
 #Sets variable for WaaS-groups, Device & User Members of the Self-Service group.
 
