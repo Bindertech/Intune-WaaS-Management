@@ -1,29 +1,532 @@
-﻿#Author: Simon Binder
+#Author: Simon Binder
 #Blog: bindertech.se
 #Twitter: @Bindertech
-#Thanks to: @daltondhcp
+#Thanks to: @daltondhcp, @davefalkus, @NickolajA and the Intune product group.
+#Most functions is copied from the Powershell Intune Samples: https://github.com/microsoftgraph/powershell-intune-samples
+#Script requires the Azure AD Powershell module or the Azure AD Preview Powershell module to run
 
-#This script is supposed to run prior to the start of each now Windows 10 servicing upgrade. Remember to change the versionname.
+Function Test-JSON(){
 
-#Using Azure Automation
-#Replace the -Name parameter with your Automation Account
+<#
+.SYNOPSIS
+This function is used to test if the JSON passed to a REST Post request is valid
+.DESCRIPTION
+The function tests if the JSON passed to the REST Post is valid
+.EXAMPLE
+Test-JSON -JSON $JSON
+Test if the JSON is valid before calling the Graph REST interface
+.NOTES
+NAME: Test-AuthHeader
+#>
 
-#$Credential = Get-AutomationPSCredential -Name 'Global Admin'
+param (
 
-Param(
-  [Parameter(Mandatory=$True,HelpMessage='Enter Windows 10 release number, for example 1709',Position=1)]
-   [string]$WindowsVersion
-	
+$JSON
+
 )
 
-Connect-AzureAD
+    try {
+
+    $TestJSON = ConvertFrom-Json $JSON -ErrorAction Stop
+    $validJson = $true
+
+    }
+
+    catch {
+
+    $validJson = $false
+    $_.Exception
+
+    }
+
+    if (!$validJson){
+    
+    Write-Host "Provided JSON isn't in valid JSON format" -f Red
+    break
+
+    }
+
+}
+
+Function Add-DeviceConfigurationPolicy(){
+
+<#
+.SYNOPSIS
+This function is used to add an device configuration policy using the Graph API REST interface
+.DESCRIPTION
+The function connects to the Graph API Interface and adds a device configuration policy
+.EXAMPLE
+Add-DeviceConfigurationPolicy -JSON $JSON
+Adds a device configuration policy in Intune
+.NOTES
+NAME: Add-DeviceConfigurationPolicy
+#>
+
+[cmdletbinding()]
+
+param
+(
+    $JSON
+)
+
+$graphApiVersion = "Beta"
+$DCP_resource = "deviceManagement/deviceConfigurations"
+
+    try {
+
+        if($JSON -eq "" -or $JSON -eq $null){
+
+        write-host "No JSON specified, please specify valid JSON for the Android Policy..." -f Red
+
+        }
+
+        else {
+
+        Test-JSON -JSON $JSON
+
+        $uri = "https://graph.microsoft.com/$graphApiVersion/$($DCP_resource)"
+        Invoke-RestMethod -Uri $uri -Headers $authToken -Method Post -Body $JSON -ContentType "application/json"
+
+        }
+
+    }
+    
+    catch {
+
+    $ex = $_.Exception
+    $errorResponse = $ex.Response.GetResponseStream()
+    $reader = New-Object System.IO.StreamReader($errorResponse)
+    $reader.BaseStream.Position = 0
+    $reader.DiscardBufferedData()
+    $responseBody = $reader.ReadToEnd();
+    Write-Host "Response content:`n$responseBody" -f Red
+    Write-Error "Request to $Uri failed with HTTP Status $($ex.Response.StatusCode) $($ex.Response.StatusDescription)"
+    write-host
+    break
+
+    }
+
+}
+
+Function Add-DeviceConfigurationPolicyAssignment(){
+
+<#
+.SYNOPSIS
+This function is used to add a device configuration policy assignment using the Graph API REST interface
+.DESCRIPTION
+The function connects to the Graph API Interface and adds a device configuration policy assignment
+.EXAMPLE
+Add-DeviceConfigurationPolicyAssignment -ConfigurationPolicyId $ConfigurationPolicyId -TargetGroupId $TargetGroupId
+Adds a device configuration policy assignment in Intune
+.NOTES
+NAME: Add-DeviceConfigurationPolicyAssignment
+#>
+
+[cmdletbinding()]
+
+param
+(
+    $ConfigurationPolicyId,
+    $TargetGroupId
+)
+
+$graphApiVersion = "Beta"
+$Resource = "deviceManagement/deviceConfigurations/$ConfigurationPolicyId/assign"
+    
+    try {
+
+        if(!$ConfigurationPolicyId){
+
+        write-host "No Configuration Policy Id specified, specify a valid Configuration Policy Id" -f Red
+        break
+
+        }
+
+        if(!$TargetGroupId){
+
+        write-host "No Target Group Id specified, specify a valid Target Group Id" -f Red
+        break
+
+        }
+
+        $ConfPolAssign = "$ConfigurationPolicyId" + "_" + "$TargetGroupId"
+
+$JSON = @"
+
+{
+  "deviceConfigurationGroupAssignments": [
+    {
+      "@odata.type": "#microsoft.graph.deviceConfigurationGroupAssignment",
+      "id": "$ConfPolAssign",
+      "targetGroupId": "$TargetGroupId"
+    }
+  ]
+}
+
+"@
+
+    $uri = "https://graph.microsoft.com/$graphApiVersion/$($Resource)"
+    Invoke-RestMethod -Uri $uri -Headers $authToken -Method Post -Body $JSON -ContentType "application/json"
+
+    }
+    
+    catch {
+
+    $ex = $_.Exception
+    $errorResponse = $ex.Response.GetResponseStream()
+    $reader = New-Object System.IO.StreamReader($errorResponse)
+    $reader.BaseStream.Position = 0
+    $reader.DiscardBufferedData()
+    $responseBody = $reader.ReadToEnd();
+    Write-Host "Response content:`n$responseBody" -f Red
+    Write-Error "Request to $Uri failed with HTTP Status $($ex.Response.StatusCode) $($ex.Response.StatusDescription)"
+    write-host
+    break
+
+    }
+
+}
+
+Function Get-SoftwareUpdatePolicy(){
+
+
+
+<#
+.SYNOPSIS
+This function is used to get Software Update policies from the Graph API REST interface
+.DESCRIPTION
+The function connects to the Graph API Interface and gets any Software Update policies
+.EXAMPLE
+Get-SoftwareUpdatePolicy -Windows10
+Returns Windows 10 Software Update policies configured in Intune
+.EXAMPLE
+Get-SoftwareUpdatePolicy -iOS
+Returns iOS update policies configured in Intune
+.NOTES
+NAME: Get-SoftwareUpdatePolicy
+#>
+
+[cmdletbinding()]
+
+param
+(
+    [switch]$Windows10,
+    [switch]$iOS
+)
+
+$graphApiVersion = "Beta"
+
+    try {
+
+        $Count_Params = 0
+
+        if($iOS.IsPresent){ $Count_Params++ }
+        if($Windows10.IsPresent){ $Count_Params++ }
+
+        if($Count_Params -gt 1){
+
+        write-host "Multiple parameters set, specify a single parameter -iOS or -Windows10 against the function" -f Red
+
+        }
+
+        elseif($Count_Params -eq 0){
+
+        Write-Host "Parameter -iOS or -Windows10 required against the function..." -ForegroundColor Red
+        Write-Host
+        break
+
+        }
+
+        elseif($Windows10){
+
+        $Resource = "deviceManagement/deviceConfigurations?`$filter=isof('microsoft.graph.windowsUpdateForBusinessConfiguration')&`$expand=groupAssignments"
+
+        $uri = "https://graph.microsoft.com/$graphApiVersion/$($Resource)"
+        (Invoke-RestMethod -Uri $uri -Headers $authToken -Method Get).value
+
+        }
+
+        elseif($iOS){
+
+        $Resource = "deviceManagement/deviceConfigurations?`$filter=isof('microsoft.graph.iosUpdateConfiguration')&`$expand=groupAssignments"
+
+        $uri = "https://graph.microsoft.com/$graphApiVersion/$($Resource)"
+        (Invoke-RestMethod -Uri $uri -Headers $authToken -Method Get).Value
+
+        }
+
+    }
+
+    catch {
+
+    $ex = $_.Exception
+    $errorResponse = $ex.Response.GetResponseStream()
+    $reader = New-Object System.IO.StreamReader($errorResponse)
+    $reader.BaseStream.Position = 0
+    $reader.DiscardBufferedData()
+    $responseBody = $reader.ReadToEnd();
+    Write-Host "Response content:`n$responseBody" -f Red
+    Write-Error "Request to $Uri failed with HTTP Status $($ex.Response.StatusCode) $($ex.Response.StatusDescription)"
+    write-host
+    break
+
+    }
+
+}
+
+
+# Import required modules
+try {
+    Import-Module -Name AzureAD -ErrorAction Stop
+    Import-Module -Name PSIntuneAuth -ErrorAction Stop
+}
+catch {
+    Write-Warning -Message "Failed to import modules"
+}
+
+# Read credentials and variables
+$AADCredential = Get-AutomationPSCredential -Name "WaaSAccount"
+$Credential = Get-AutomationPSCredential -Name "WaaSAccount"
+$AppClientID = Get-AutomationVariable -Name "AppClientID"
+$WindowsVersion = Get-AutomationVariable -Name "WindowsVersion"
+$Tenantname = Get-AutomationVariable -Name "Tenantname"
+
+# Acquire authentication token
+try {
+    Write-Output -InputObject "Attempting to retrieve authentication token"
+    $AuthToken = Get-MSIntuneAuthToken -TenantName $Tenantname -ClientID $AppClientID -Credential $Credential
+    if ($AuthToken -ne $null) {
+        Write-Output -InputObject "Successfully retrieved authentication token"
+    }
+}
+catch [System.Exception] {
+    Write-Warning -Message "Failed to retrieve authentication token"
+}
+
+Connect-AzureAD -Credential $AADCredential
 
 #Enter the Windows 10 version you want to deploy in $WindowsVersion. Change the names (or add additional rings) as you like, but remember to change any other corresponding scripts.
 
-$WaaSGroups = "$WindowsVersion-SAC-T - Technical", "$WindowsVersion-SAC-T Compatibility", "$WindowsVersion-SAC-B - First Ring", "$WindowsVersion-SAC-B - Second Ring", "$WindowsVersion-Compatibility Issues", "$WindowsVersion-Self-Service Deferred"  
+$WaaSGroups = "$WindowsVersion-SAC - Technical", "$WindowsVersion-SAC - Compatibility", "$WindowsVersion-SAC - First Ring", "$WindowsVersion-SAC - Second Ring", "$WindowsVersion-Compatibility Issues", "$WindowsVersion-Self-Service Deferred"  
+
+$NumberofGroups = $WaaSGroups.Count
+
+$i = 0
+
+$JSONConfigurations = @"
+
+    {
+
+    "displayName":"$WindowsVersion-SAC - Technical",
+    "description":"$WindowsVersion-SAC - Technical",
+    "@odata.type":"#microsoft.graph.windowsUpdateForBusinessConfiguration",
+    "businessReadyUpdatesOnly":"all",
+    "microsoftUpdateServiceAllowed":true,
+    "driversExcluded":false,
+    "featureUpdatesDeferralPeriodInDays":0,
+    "qualityUpdatesDeferralPeriodInDays":0,
+    "automaticUpdateMode":"autoInstallAtMaintenanceTime",
+    "deliveryOptimizationMode":"httpWithInternetPeering",
+
+        "installationSchedule":{
+        "@odata.type":"#microsoft.graph.windowsUpdateActiveHoursInstall",
+        "activeHoursStart":"08:00:00.0000000",
+        "activeHoursEnd":"17:00:00.0000000"
+        }
+
+    }
+
+"@, @"
+
+    {
+
+    "displayName":"$WindowsVersion-SAC - Compatibility",
+    "description":"$WindowsVersion-SAC - Compatibility",
+    "@odata.type":"#microsoft.graph.windowsUpdateForBusinessConfiguration",
+    "businessReadyUpdatesOnly":"all",
+    "microsoftUpdateServiceAllowed":true,
+    "driversExcluded":false,
+    "featureUpdatesDeferralPeriodInDays":30,
+    "qualityUpdatesDeferralPeriodInDays":3,
+    "automaticUpdateMode":"autoInstallAtMaintenanceTime",
+    "deliveryOptimizationMode":"httpWithPeeringNat",
+
+        "installationSchedule":{
+        "@odata.type":"#microsoft.graph.windowsUpdateActiveHoursInstall",
+        "activeHoursStart":"08:00:00.0000000",
+        "activeHoursEnd":"17:00:00.0000000"
+        }
+
+    }
+
+"@, @"
+
+    {
+
+    "displayName":"$WindowsVersion-SAC - First Ring",
+    "description":"$WindowsVersion-SAC - First Ring",
+    "@odata.type":"#microsoft.graph.windowsUpdateForBusinessConfiguration",
+    "businessReadyUpdatesOnly":"all",
+    "microsoftUpdateServiceAllowed":true,
+    "driversExcluded":false,
+    "featureUpdatesDeferralPeriodInDays":90,
+    "qualityUpdatesDeferralPeriodInDays":5,
+    "automaticUpdateMode":"autoInstallAtMaintenanceTime",
+    "deliveryOptimizationMode":"httpWithPeeringNat",
+
+        "installationSchedule":{
+        "@odata.type":"#microsoft.graph.windowsUpdateActiveHoursInstall",
+        "activeHoursStart":"08:00:00.0000000",
+        "activeHoursEnd":"17:00:00.0000000"
+        }
+
+    }
+
+"@, @"
+
+    {
+
+    "displayName":"$WindowsVersion-SAC - Second Ring",
+    "description":"$WindowsVersion-SAC - Second Ring",
+    "@odata.type":"#microsoft.graph.windowsUpdateForBusinessConfiguration",
+    "businessReadyUpdatesOnly":"all",
+    "microsoftUpdateServiceAllowed":true,
+    "driversExcluded":false,
+    "featureUpdatesDeferralPeriodInDays":120,
+    "qualityUpdatesDeferralPeriodInDays":7,
+    "automaticUpdateMode":"autoInstallAtMaintenanceTime",
+    "deliveryOptimizationMode":"httpWithPeeringNat",
+
+        "installationSchedule":{
+        "@odata.type":"#microsoft.graph.windowsUpdateActiveHoursInstall",
+        "activeHoursStart":"08:00:00.0000000",
+        "activeHoursEnd":"17:00:00.0000000"
+        }
+
+    }
+
+"@, @"
+
+    {
+
+    "displayName":"$WindowsVersion-Compatibility Issues",
+    "description":"$WindowsVersion-Compatibility Issues",
+    "@odata.type":"#microsoft.graph.windowsUpdateForBusinessConfiguration",
+    "businessReadyUpdatesOnly":"all",
+    "microsoftUpdateServiceAllowed":true,
+    "driversExcluded":false,
+    "featureUpdatesDeferralPeriodInDays":180,
+    "qualityUpdatesDeferralPeriodInDays":30,
+    "automaticUpdateMode":"autoInstallAtMaintenanceTime",
+    "deliveryOptimizationMode":"httpWithPeeringNat",
+
+        "installationSchedule":{
+        "@odata.type":"#microsoft.graph.windowsUpdateActiveHoursInstall",
+        "activeHoursStart":"08:00:00.0000000",
+        "activeHoursEnd":"17:00:00.0000000"
+        }
+
+    }
+
+"@, @"
+
+    {
+
+    "displayName":"$WindowsVersion-Self-Service Deferred",
+    "description":"$WindowsVersion-Self-Service Deferred",
+    "@odata.type":"#microsoft.graph.windowsUpdateForBusinessConfiguration",
+    "businessReadyUpdatesOnly":"all",
+    "microsoftUpdateServiceAllowed":true,
+    "driversExcluded":false,
+    "featureUpdatesDeferralPeriodInDays":140,
+    "qualityUpdatesDeferralPeriodInDays":21,
+    "automaticUpdateMode":"autoInstallAtMaintenanceTime",
+    "deliveryOptimizationMode":"httpOnly",
+
+        "installationSchedule":{
+        "@odata.type":"#microsoft.graph.windowsUpdateActiveHoursInstall",
+        "activeHoursStart":"08:00:00.0000000",
+        "activeHoursEnd":"17:00:00.0000000"
+        }
+
+    }
+
+"@
+
+foreach ($JSON in $JSONConfigurations) {
+
+    $PolicyName = $WaaSGroups | Select-Object -Index $i
+
+    $Policyexist = Get-SoftwareUpdatePolicy -Windows10 | Where-Object -Property Displayname -EQ $PolicyName
+
+    if ($Policyexist -eq $null)
+            {	
+                Write-Host "$PolicyName do not exist, creating $PolicyName"
+
+                try {
+                    
+                    Add-DeviceConfigurationPolicy -JSON $JSON
+
+                    }
+
+                Catch {
+                      
+                      Write-Host "Unable to create the policy: $PolicyName, script will terminate"
+                      Write-Host "$_.Exception.Message"
+                      Break
+
+                      }
+
+            }
+    else
+            {
+                
+               Write-Host "$PolicyName exist, moving to assignment"
+
+            }
+            $i++
+
+}
 
 foreach ($WaaSGroup in $WaaSGroups){
 
-	New-AzureADGroup -Description "$WaaSGroup" -DisplayName "$WaaSGroup" -SecurityEnabled $true -MailEnabled $false -MailNickName 'NotSet'
+    try {
+
+    $Groupexist = Get-AzureADGroup -SearchString $WaaSGroup | Select-Object -ExpandProperty ObjectID
+
+    if ($Groupexist -eq $null)
+            {	
+                Write-Host "$WaaSGroup do not exist, creating $WaaSGroup"
+
+                try {
+                    
+                    New-AzureADGroup -Description "$WaaSGroup" -DisplayName "$WaaSGroup" -SecurityEnabled $true -MailEnabled $false -MailNickName 'NotSet'
+                    Start-Sleep -Seconds 5
+                    $Groupexist = Get-AzureADGroup -SearchString $WaaSGroup | Select-Object -ExpandProperty ObjectID
+
+                    }
+
+                Catch {
+                      
+                      "Unable to create $WaaSGroup, script will terminate"
+                      Break
+
+                      }
+
+            }
+    else
+            {
+                
+               Write-Host "$WaaSGroup exist, moving to assignment"
+
+            }
+
+        }
+    
+    Finally {
+                $PolicyID = Get-SoftwareUpdatePolicy -Windows10 | Where-Object -Property Displayname -EQ $WaaSGroup | Select-Object -ExpandProperty id
+                Add-DeviceConfigurationPolicyAssignment -ConfigurationPolicyId $PolicyID -TargetGroupId $GroupExist
+
+            }
 
 }
