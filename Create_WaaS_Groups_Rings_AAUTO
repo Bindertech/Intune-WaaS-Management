@@ -293,13 +293,18 @@ $Tenantname = Get-AutomationVariable -Name "Tenantname"
 
 # Acquire authentication token
 try {
+
     Write-Output -InputObject "Attempting to retrieve authentication token"
     $AuthToken = Get-MSIntuneAuthToken -TenantName $Tenantname -ClientID $AppClientID -Credential $Credential
+
     if ($AuthToken -ne $null) {
+
         Write-Output -InputObject "Successfully retrieved authentication token"
     }
 }
+
 catch [System.Exception] {
+
     Write-Warning -Message "Failed to retrieve authentication token"
 }
 
@@ -459,32 +464,32 @@ foreach ($JSON in $JSONConfigurations) {
 
     $Policyexist = Get-SoftwareUpdatePolicy -Windows10 | Where-Object -Property Displayname -EQ $PolicyName
 
-    if ($Policyexist -eq $null)
-            {	
-                Write-Host "$PolicyName do not exist, creating $PolicyName"
+    if ($Policyexist -eq $null) {
+    	
+                                  Write-Host "$PolicyName do not exist, creating $PolicyName"
 
-                try {
+                                  try {
                     
-                    Add-DeviceConfigurationPolicy -JSON $JSON
+                                        Add-DeviceConfigurationPolicy -JSON $JSON
 
-                    }
+                                      }
 
-                Catch {
+                                Catch {
                       
-                      Write-Host "Unable to create the policy: $PolicyName, script will terminate"
-                      Write-Host "$_.Exception.Message"
-                      Break
+                                        Write-Host "Unable to create the policy: $PolicyName, script will terminate"
+                                        Write-Host "$_.Exception.Message"
+                                        Break
 
-                      }
+                                      }
 
-            }
-    else
-            {
-                
-               Write-Host "$PolicyName exist, moving to assignment"
+                                 }
 
-            }
-            $i++
+                            else {
+                                    
+                                  Write-Host "$PolicyName exist, moving to assignment"
+
+                                 }
+                            $i++
 
 }
 
@@ -492,41 +497,42 @@ foreach ($WaaSGroup in $WaaSGroups){
 
     try {
 
-    $Groupexist = Get-AzureADGroup -SearchString $WaaSGroup | Select-Object -ExpandProperty ObjectID
+        $Groupexist = Get-AzureADGroup -SearchString $WaaSGroup | Select-Object -ExpandProperty ObjectID
 
-    if ($Groupexist -eq $null)
-            {	
-                Write-Host "$WaaSGroup do not exist, creating $WaaSGroup"
+        if ($Groupexist -eq $null) {
+                	
+                                    Write-Host "$WaaSGroup do not exist, creating $WaaSGroup"
 
-                try {
+                                    try {
                     
-                    New-AzureADGroup -Description "$WaaSGroup" -DisplayName "$WaaSGroup" -SecurityEnabled $true -MailEnabled $false -MailNickName 'NotSet'
-                    Start-Sleep -Seconds 5
-                    $Groupexist = Get-AzureADGroup -SearchString $WaaSGroup | Select-Object -ExpandProperty ObjectID
+                                        New-AzureADGroup -Description "$WaaSGroup" -DisplayName "$WaaSGroup" -SecurityEnabled $true -MailEnabled $false -MailNickName 'NotSet'
+                                        Start-Sleep -Seconds 5
+                                        $Groupexist = Get-AzureADGroup -SearchString $WaaSGroup | Select-Object -ExpandProperty ObjectID
 
-                    }
+                                        }
 
-                Catch {
+                                    Catch {
                       
-                      "Unable to create $WaaSGroup, script will terminate"
-                      Break
+                                          "Unable to create $WaaSGroup, script will terminate"
+                                          Break
 
-                      }
+                                          }
 
-            }
-    else
-            {
+                                         }
+
+                                    else {
                 
-               Write-Host "$WaaSGroup exist, moving to assignment"
+                                          Write-Host "$WaaSGroup exist, moving to assignment"
 
-            }
+                                          }
 
-        }
+                                }
     
-    Finally {
-                $PolicyID = Get-SoftwareUpdatePolicy -Windows10 | Where-Object -Property Displayname -EQ $WaaSGroup | Select-Object -ExpandProperty id
-                Add-DeviceConfigurationPolicyAssignment -ConfigurationPolicyId $PolicyID -TargetGroupId $GroupExist
+                Finally {
 
-            }
+                        $PolicyID = Get-SoftwareUpdatePolicy -Windows10 | Where-Object -Property Displayname -EQ $WaaSGroup | Select-Object -ExpandProperty id
+                        Add-DeviceConfigurationPolicyAssignment -ConfigurationPolicyId $PolicyID -TargetGroupId $GroupExist
+
+                        }
 
 }
