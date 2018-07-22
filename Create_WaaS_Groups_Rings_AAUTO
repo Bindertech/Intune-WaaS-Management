@@ -7,23 +7,23 @@
 
 Function Test-JSON(){
 
-<#
-.SYNOPSIS
-This function is used to test if the JSON passed to a REST Post request is valid
-.DESCRIPTION
-The function tests if the JSON passed to the REST Post is valid
-.EXAMPLE
-Test-JSON -JSON $JSON
-Test if the JSON is valid before calling the Graph REST interface
-.NOTES
-NAME: Test-AuthHeader
-#>
+  <#
+      .SYNOPSIS
+      This function is used to test if the JSON passed to a REST Post request is valid
+      .DESCRIPTION
+      The function tests if the JSON passed to the REST Post is valid
+      .EXAMPLE
+      Test-JSON -JSON $JSON
+      Test if the JSON is valid before calling the Graph REST interface
+      .NOTES
+      NAME: Test-AuthHeader
+  #>
 
-param (
+  param (
 
-$JSON
+    $JSON
 
-)
+  )
 
     try {
 
@@ -50,27 +50,27 @@ $JSON
 
 Function Add-DeviceConfigurationPolicy(){
 
-<#
-.SYNOPSIS
-This function is used to add an device configuration policy using the Graph API REST interface
-.DESCRIPTION
-The function connects to the Graph API Interface and adds a device configuration policy
-.EXAMPLE
-Add-DeviceConfigurationPolicy -JSON $JSON
-Adds a device configuration policy in Intune
-.NOTES
-NAME: Add-DeviceConfigurationPolicy
-#>
+  <#
+      .SYNOPSIS
+      This function is used to add an device configuration policy using the Graph API REST interface
+      .DESCRIPTION
+      The function connects to the Graph API Interface and adds a device configuration policy
+      .EXAMPLE
+      Add-DeviceConfigurationPolicy -JSON $JSON
+      Adds a device configuration policy in Intune
+      .NOTES
+      NAME: Add-DeviceConfigurationPolicy
+  #>
 
-[cmdletbinding()]
+  [cmdletbinding()]
 
-param
-(
+  param
+  (
     $JSON
-)
+  )
 
-$graphApiVersion = "Beta"
-$DCP_resource = "deviceManagement/deviceConfigurations"
+  $graphApiVersion = "Beta"
+  $DCP_resource = "deviceManagement/deviceConfigurations"
 
     try {
 
@@ -110,28 +110,28 @@ $DCP_resource = "deviceManagement/deviceConfigurations"
 
 Function Add-DeviceConfigurationPolicyAssignment(){
 
-<#
-.SYNOPSIS
-This function is used to add a device configuration policy assignment using the Graph API REST interface
-.DESCRIPTION
-The function connects to the Graph API Interface and adds a device configuration policy assignment
-.EXAMPLE
-Add-DeviceConfigurationPolicyAssignment -ConfigurationPolicyId $ConfigurationPolicyId -TargetGroupId $TargetGroupId
-Adds a device configuration policy assignment in Intune
-.NOTES
-NAME: Add-DeviceConfigurationPolicyAssignment
-#>
+  <#
+      .SYNOPSIS
+      This function is used to add a device configuration policy assignment using the Graph API REST interface
+      .DESCRIPTION
+      The function connects to the Graph API Interface and adds a device configuration policy assignment
+      .EXAMPLE
+      Add-DeviceConfigurationPolicyAssignment -ConfigurationPolicyId $ConfigurationPolicyId -TargetGroupId $TargetGroupId
+      Adds a device configuration policy assignment in Intune
+      .NOTES
+      NAME: Add-DeviceConfigurationPolicyAssignment
+  #>
 
-[cmdletbinding()]
+  [cmdletbinding()]
 
-param
-(
+  param
+  (
     $ConfigurationPolicyId,
     $TargetGroupId
-)
+  )
 
-$graphApiVersion = "Beta"
-$Resource = "deviceManagement/deviceConfigurations/$ConfigurationPolicyId/assign"
+  $graphApiVersion = "Beta"
+  $Resource = "deviceManagement/deviceConfigurations/$ConfigurationPolicyId/assign"
     
     try {
 
@@ -151,7 +151,7 @@ $Resource = "deviceManagement/deviceConfigurations/$ConfigurationPolicyId/assign
 
         $ConfPolAssign = "$ConfigurationPolicyId" + "_" + "$TargetGroupId"
 
-$JSON = @"
+    $JSON = @"
 
 {
   "deviceConfigurationGroupAssignments": [
@@ -191,30 +191,30 @@ Function Get-SoftwareUpdatePolicy(){
 
 
 
-<#
-.SYNOPSIS
-This function is used to get Software Update policies from the Graph API REST interface
-.DESCRIPTION
-The function connects to the Graph API Interface and gets any Software Update policies
-.EXAMPLE
-Get-SoftwareUpdatePolicy -Windows10
-Returns Windows 10 Software Update policies configured in Intune
-.EXAMPLE
-Get-SoftwareUpdatePolicy -iOS
-Returns iOS update policies configured in Intune
-.NOTES
-NAME: Get-SoftwareUpdatePolicy
-#>
+  <#
+      .SYNOPSIS
+      This function is used to get Software Update policies from the Graph API REST interface
+      .DESCRIPTION
+      The function connects to the Graph API Interface and gets any Software Update policies
+      .EXAMPLE
+      Get-SoftwareUpdatePolicy -Windows10
+      Returns Windows 10 Software Update policies configured in Intune
+      .EXAMPLE
+      Get-SoftwareUpdatePolicy -iOS
+      Returns iOS update policies configured in Intune
+      .NOTES
+      NAME: Get-SoftwareUpdatePolicy
+  #>
 
-[cmdletbinding()]
+  [cmdletbinding()]
 
-param
-(
+  param
+  (
     [switch]$Windows10,
     [switch]$iOS
-)
+  )
 
-$graphApiVersion = "Beta"
+  $graphApiVersion = "Beta"
 
     try {
 
